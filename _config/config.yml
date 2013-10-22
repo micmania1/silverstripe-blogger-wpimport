@@ -1,0 +1,33 @@
+---
+Name: 'blogger-wordpressimport'
+After: 'framework/*', 'cms/*'
+---
+Director:
+  rules:
+    'import//$Action': 'WordpressParser'
+
+
+---
+Only:
+  moduleexists: 'silverstripe-blog'
+---
+Blog:
+  extensions:
+    - 'WPImporter'
+
+BlogPost:
+  extensions:
+    - 'WpImportedObject'
+
+
+---
+Only:
+  moduleexists: 'comments'
+---
+Comment:
+  extensions:
+    - 'WpImportedObject'
+
+WordpressParser:
+  extensions:
+    - 'WordpressCommentImport'

@@ -9,6 +9,10 @@ class WpImporter extends DataExtension
 {
 
 	function updateCMSFields(FieldList $fields) {
+		$fields->addFieldsToTab("Root.Import",
+			$uploadField = WordpressImportField::create("WordpressFile", "WordPress File (XML)"));
+		return $fields;
+
 		$html_str = '<iframe name="WpImport" src="WpImporter_Controller/index/' . $this->owner->ID . '" width="500"> </iframe>';
 		$fields->addFieldToTab('Root.Import', new LiteralField("ImportIframe", $html_str));
 	}
@@ -26,15 +30,12 @@ class WpImporter_Controller extends Controller
 			Security::permissionFailure();
 
 		// Check for requirements
-		if (!class_exists('BlogHolder'))
-			user_error('Please install the blog module before importing from Wordpress', E_USER_ERROR);
+		if (!class_exists('Blog'))
+			user_error('Please micmania1/silverstripe-blogger module before importing from Wordpress', E_USER_ERROR);
 	}
 
-	protected function getBlogHolderID() {
-		if (isset($_REQUEST['BlogHolderID']))
-			return $_REQUEST['BlogHolderID'];
-
-		return $this->request->param('ID');
+	protected function getBlogID() {
+		return CMSMain::currentPageID();
 	}
 
 	/*
@@ -45,7 +46,7 @@ class WpImporter_Controller extends Controller
 		return new Form($this, "UploadForm",
 						new FieldList(
 								new FileField("XMLFile", 'Wordpress XML file'),
-								new HiddenField("BlogHolderID", '', $this->getBlogHolderID())
+								new HiddenField("BlogHolderID", '', $this->getBlogID())
 						),
 						new FieldList(
 								new FormAction('doUpload', 'Import Wordpress XML file')
@@ -54,8 +55,11 @@ class WpImporter_Controller extends Controller
 	}
 
 	protected function getOrCreateComment($wordpressID) {
-		if ($wordpressID && $comment = DataObject::get('Comment')->filter(array('WordpressID' => $wordpressID))->first())
+		if ($wordpressID 
+			&& $comment = DataObject::get('Comment')->filter(array('WordpressID' => $wordpressID))->first())
+		{
 			return $comment;
+		}
 
 		return Comment::create();
 	}
@@ -85,7 +89,7 @@ class WpImporter_Controller extends Controller
 		// create a blog entry
 		$entry = $this->getOrCreatePost($post['WordpressID']);
 
-		$entry->ParentID = $this->getBlogHolderID();
+		$entry->ParentID = $this->getBlogID();
 
 		// $posts array and $entry have the same key/field names
 		// so we can use update here.

@@ -64,13 +64,16 @@ class WpParser
 	public function ParseTags($cats) {
 		// Uses this array to check if the category to be added already exists in the post
 		$categories = array();
-		foreach ($cats as $cat)
-		{
+		foreach ($cats as $cat) {
 			// is this in tags or categories? We only want categories to become SS Tags
-			if (in_array($cat['domain'], self::$allowed_category_domains) && !in_array($cat, $categories))
-				$categories[] = (string) $cat;
+			if (in_array($cat['domain'], self::$allowed_category_domains)) {
+				if($cat['domain'] == "post_tag") {
+					$this->tags[] = $cat;
+				} else if ($cat['domain'] == 'category') {
+					$this->categories[] = $cat;
+				}
+			}
 		}
-		return join(', ', $categories);
 	}
 
 	/**
