@@ -13,7 +13,7 @@ Only:
 ---
 Blog:
   extensions:
-    - 'WPImporter'
+    - 'WordpressImportBlogExtension'
 
 BlogPost:
   extensions:

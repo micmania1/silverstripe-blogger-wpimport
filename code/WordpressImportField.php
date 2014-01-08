@@ -109,7 +109,7 @@ class WordpressImportField extends UploadField {
 		if(Permission::check("CMS_ACCESS_CMSMain")) {
 			$file = File::get()->byId($file_id);
 			if(!$file) {
-				return $response->httpError(404, "Not Found");
+				return $this->httpError(404, "Not Found");
 			}
 			$parser = Injector::inst()->create("WordpressImporter");
 			$parser->setFile($file->Filename);

@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * Extension to add comments to a blog. This depends on the official silverstripe comments module
+ * being present.
+ *
+ * @package silverstripe
+ * @subpackage bloggerimport
+ *
+ * @author Michael Strong <micmania@hotmail.co.uk>
+**/
 class WordpressCommentImport extends Extension {
 
 	protected $comments = array();

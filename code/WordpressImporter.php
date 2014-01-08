@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Wordpress importe class which handles the actual import.
+ * Wordpress import class which handles the actual import.
  *
  * @package silverstripe
- * @subpackage bloggerwpimport
+ * @subpackage bloggerimport
  *
  * @author Michael Strong <micmania@hotmail.co.uk>
 **/
@@ -97,28 +97,12 @@ class WordpressImporter extends Object {
 
 
 
-	public function reset() {
-		$cats = BlogCategory::get();
-		foreach($cats as $cat) {
-			$cat->delete();
-		}
-
-		$tags = BlogTag::get();
-		foreach($tags as $tag) {
-			$tag->delete();
-		}
-
-		$comments = Comment::get();
-		foreach($comments as $comment) {
-			$comment->delete();
-		}
-
-		$posts = Versioned::get_by_stage("BlogPost", "Stage");
-		foreach($posts as $post) {
-			$post->deleteFromStage("Live");
-			$post->delete();
-		}
-	}
+	/** 
+	 * Stores the SimpleXMLElement from the xml file.
+	 *
+	 * @var SimpleXMLElement
+	**/
+	public $simpleXml;
 
 
 	
@@ -126,8 +110,6 @@ class WordpressImporter extends Object {
 		// Temporarily set a max execution time.
 		$maxExecutionTime = ini_get("max_execution_time");
 		ini_set("max_execution_time", (int) $this->config()->get("max_execution_time"));
-
-		$this->reset();
 
 		// Temporary
 		$this->blog = Blog::get()->first();
@@ -146,8 +128,6 @@ class WordpressImporter extends Object {
 	 * Setup the importer.
 	**/
 	public function setup() {
-		$this->reset();
-
 		// Setup categories
 		$categories = BlogCategory::get()
 			->filter("BlogID", $this->getBlog()->ID)
@@ -299,14 +279,14 @@ class WordpressImporter extends Object {
 	**/
 	public function parse($file) {
 		if(file_exists($file)) {
-			$simpleXML = simplexml_load_file($file) or die('Cannot open file.');
-			$this->namespaces = $simpleXML->getNamespaces(TRUE);
+			$this->simpleXml = simplexml_load_file($file) or die('Cannot open file.');
+			$this->namespaces = $this->simpleXml->getNamespaces(TRUE);
 
-			$this->importBlogCategory($simpleXML);
-			$this->importBlogTag($simpleXML);
-			$this->importBlogPost($simpleXML);
-			$this->importAssets($simpleXML);
-			$this->extend("importExtras", $simpleXML);
+			$this->importBlogCategory();
+			$this->importBlogTag();
+			$this->importBlogPost();
+			$this->importAssets();
+			$this->extend("importExtras");
 			
 			$data = array();
 			if(!empty($this->created)) {
@@ -331,9 +311,9 @@ class WordpressImporter extends Object {
 	 * @param $element SimpleXMLElement
 	 * @param $namespaces array
 	**/
-	public function importBlogCategory(SimpleXMLElement $element) {
+	public function importBlogCategory() {
 
-		foreach($element->channel->children($this->namespaces['wp'])->category as $category) {
+		foreach($this->simpleXml->channel->children($this->namespaces['wp'])->category as $category) {
 			$title = trim((string) $category->cat_name);
 			if(!array_key_exists($title, $this->categories)) {
 				$cat = BlogCategory::create();
@@ -343,7 +323,7 @@ class WordpressImporter extends Object {
 				$cat->BlogID = $this->getBlog()->ID;
 
 				// Add hook to update blog category
-				$this->extend("beforeImportBlogCategory", $element, $cat);
+				$this->extend("beforeImportBlogCategory", $cat);
 				
 				if(!$this->isDryRun()) {
 					$cat->write();
@@ -351,6 +331,11 @@ class WordpressImporter extends Object {
 
 				$this->categories[$cat->Title] = $cat;
 				$this->addImportedObject("BlogCategory", $cat);
+			} else {
+				$this->categories[$title] = BlogCategory::get()
+					->filter("Title", $title)
+					->filter("BlogID", $this->getBlog()->ID)
+					->first();
 			}
 		}
 
@@ -364,9 +349,9 @@ class WordpressImporter extends Object {
 	 * @param $element SimpleXMLElement
 	 * @param $namespaces array
 	**/
-	public function importBlogTag(SimpleXMLElement $element) {
+	public function importBlogTag() {
 
-		foreach($element->channel->children($this->namespaces['wp'])->tag as $tag) {
+		foreach($this->simpleXml->channel->children($this->namespaces['wp'])->tag as $tag) {
 			$title = trim((string) $tag->tag_name);
 			if(!array_key_exists($title, $this->tags)) {
 				$t = BlogTag::create();
@@ -376,7 +361,7 @@ class WordpressImporter extends Object {
 				$t->BlogID = $this->getBlog()->ID;
 
 				// Add hook to update blog tag
-				$this->extend("beforeImportBlogTag", $element, $t);
+				$this->extend("beforeImportBlogTag", $t);
 				
 				if(!$this->isDryRun()) {
 					$t->write();
@@ -384,6 +369,10 @@ class WordpressImporter extends Object {
 
 				$this->tags[$t->Title] = $t;
 				$this->addImportedObject("BlogTag", $t);
+			} else {
+				$this->tags[$title] = BlogTag::get()->filter("Title", $title)
+					->filter("BlogID", $this->getBlog()->ID)
+					->first();
 			}
 		}
 	}
@@ -395,8 +384,8 @@ class WordpressImporter extends Object {
 	 *
 	 * @param $element SimpleXMLElement
 	**/
-	public function importBlogPost(SimpleXMLElement $element) {
-		foreach($element->channel->children()->item as $item) {
+	public function importBlogPost() {
+		foreach($this->simpleXml->channel->children()->item as $item) {
 			$content = $item->children($this->namespaces['content'])->encoded;
 			$excerpt = $item->children($this->namespaces['excerpt'])->encoded;
 			$post = $item->children($this->namespaces['wp']);
@@ -439,9 +428,9 @@ class WordpressImporter extends Object {
 	 *
 	 * @param $element SimpleXMLElement
 	**/
-	public function importAssets(SimpleXMLElement $element) {
+	public function importAssets() {
 		if($this->getImportAssets()) {
-			foreach($element->channel->children()->item as $item) {
+			foreach($this->simpleXml->channel->children()->item as $item) {
 				$attachment = $item->children($this->namespaces['wp']);
 
 				$url = (string) $attachment->attachment_url;
@@ -468,18 +457,50 @@ class WordpressImporter extends Object {
 					if(!file_exists($filename)) {
 						if(!$this->isDryRun()) {
 							// Lets get that image!
-							$source = fopen($url, 'r') 
-								or die("Unable to read source file: " . $filename);
-							$dest = fopen($filename, 'w') 
-								or die("Unable to write file to destination: " . $filename);
-							stream_copy_to_stream($source, $dest);
-							fclose($source);
-							fclose($dest);
-
+							$source = fopen($url, 'r');
+							$dest = fopen($filename, 'w');
+							if($source && $dest) {
+								stream_copy_to_stream($source, $dest);
+							}
+							if($source) fclose($source);
+							if($dest) fclose($dest);
 							Filesystem::sync();
-						}	
+						}
 
 						$this->addImportedObject("File", $filename);
+					}
+
+
+					// By now we should have a file that exists
+					if(file_exists($filename)) {
+						$file = Image::get()
+							->filter("Filename", ltrim(Director::makeRelative($filename), '/'))
+							->first();
+
+						// Set the blog post featured image.
+						if($file) {
+							$postParent = (string) $attachment->post_parent;
+
+							// Get the post ID
+							$id = array_key_exists((int) $attachment->post_parent, $this->posts) 
+								? $this->posts[(int) $attachment->post_parent] : false;
+
+							// And get the post
+							if(is_int($id)) $blogPost = BlogPost::get()->byId($id);
+							else $blogPost = null;
+
+							if($blogPost) {
+								$blogPost->FeaturedImageID = $file->ID;
+
+								if(!$this->isDryRun()) {
+									$isPublished = $blogPost->isPublished();
+									$blogPost->writeToStage("Stage");
+									if($isPublished == "publish") {
+										$blogPost->publish("Stage", "Live");
+									}
+								}
+							}
+						}
 					}
 				}
 			}

@@ -50,7 +50,7 @@
 						+ this.getFileId(),
 					success: function(data) {
 					 	for(key in data) {
-							console.log(data[key].Count + " " + data[key].Title + " created.");
+							console.log(data[key].Count + " " + data[key].Title + " to create.");
 						}
 						self.removeClass("loading");
 					}
@@ -64,7 +64,6 @@
 			**/
 			import: function() {
 				var config = this.getConfig();
-				console.log(config);
 				var url = config.urlImport;
 
 				var self = $(this);
